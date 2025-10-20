@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Dashboard de Cotações</h3>
+<div class="row">
+  <div class="col-md-3">
+    <div class="card p-3 mb-3">
+      <h6>Filtros</h6>
+      <label>Exchange</label>
+      <select id="exchange" class="form-select mb-2"></select>
+      <label>Símbolo</label>
+      <select id="symbol" class="form-select mb-2"></select>
+      <div class="d-grid gap-2">
+        <button id="refreshBtn" class="btn btn-primary">Buscar Agora</button>
+        <button id="showChart" class="btn btn-outline-light">Mostrar Gráfico</button>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-9">
+    <div class="card p-3 mb-3">
+      <canvas id="lineChart" height="150"></canvas>
+    </div>
+    <div class="card p-3">
+      <h6>Símbolos por Exchange</h6>
+      <div id="exchangeList"></div>
+    </div>
+  </div>
+</div>
+<script>
+const EXCHANGES = {{ exchanges | tojson }};
+let socket = io("/cotacoes");
+socket.on("connect", ()=>console.log("socket connected"));
+socket.on("price_update", function(data){
+  const box = document.getElementById('exchangeList');
+  box.innerHTML = `<div><strong>${data.symbol}</strong>: ${data.price}</div>`;
+});
+function populateExchanges(){
+  const sel=document.getElementById('exchange'); sel.innerHTML='';
+  Object.keys(EXCHANGES).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.text=k; sel.appendChild(o); });
+  sel.addEventListener('change', populateSymbols); populateSymbols();
+}
+function populateSymbols(){ const ex=document.getElementById('exchange').value; const sym=document.getElementById('symbol'); sym.innerHTML=''; EXCHANGES[ex].forEach(s=>{ const o=document.createElement('option'); o.value=s.symbol; o.text=s.name+' ('+s.symbol+')'; sym.appendChild(o); }); }
+document.addEventListener('DOMContentLoaded', ()=>{ populateExchanges(); document.getElementById('refreshBtn').addEventListener('click', async ()=>{ const symbol=document.getElementById('symbol').value; const r=await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`); const d=await r.json(); alert(JSON.stringify(d)); }); });
+</script>
+{% endblock %}

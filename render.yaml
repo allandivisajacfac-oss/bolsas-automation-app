@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: automacao-cotacoes
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -k eventlet -w 1 automacao_cotacoes:app -b 0.0.0.0:5000
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+databases:
+  - name: cotacoes-db
+    plan: free

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cotações Globais</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: linear-gradient(180deg,#0b1220,#071023); color:#e6eef8; font-family:Arial;text-align:center; }
+        h1 { color:#61dafb; }
+        table { margin:auto; border-collapse:collapse; }
+        th,td { padding:8px 12px; border:1px solid #444; }
+        canvas { width:90%%; max-width:800px; margin-top:20px; }
+        button { background:#61dafb; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; }
+        button:hover { background:#4fc3f7; }
+    </style>
+</head>
+<body>
+    <h1>Cotações em Tempo Real</h1>
+    <table id="tabela">
+        <tr><th>Simbolo</th><th>Valor</th></tr>
+    </table>
+    <button onclick="atualizarGrafico()">Mostrar Gráfico</button>
+    <canvas id="grafico"></canvas>
+
+<script>
+let chart;
+async function carregarDados(){
+    const r = await fetch('/dados');
+    const dados = await r.json();
+    const tabela = document.getElementById('tabela');
+    tabela.innerHTML = '<tr><th>Simbolo</th><th>Valor</th></tr>' +
+        dados.map(d => `<tr><td>${d.simbolo}</td><td>${d.valor.toFixed(2)}</td></tr>`).join('');
+    return dados;
+}
+async function atualizarGrafico(){
+    const dados = await carregarDados();
+    const ctx = document.getElementById('grafico');
+    if(chart) chart.destroy();
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dados.map(d => d.simbolo),
+            datasets: [{ label: 'Valor Atual', data: dados.map(d => d.valor), borderColor:'#61dafb', tension:0.4 }]
+        }
+    });
+}
+setInterval(carregarDados, 600000);
+carregarDados();
+</script>
+</body>
+</html>

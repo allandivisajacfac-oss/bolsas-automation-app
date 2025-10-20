@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row">
+  <div class="col-md-3">
+    <div class="card p-3 mb-3">
+      <h6>Filtros</h6>
+      <label class="muted">Exchange</label>
+      <select id="exchange" class="form-select mb-2"></select>
+      <label class="muted">Símbolo</label>
+      <select id="symbol" class="form-select mb-2"></select>
+      <div class="d-grid gap-2">
+        <button id="refreshBtn" class="btn btn-primary">Buscar Agora</button>
+        <button id="showChart" class="btn btn-outline-light">Mostrar Gráfico</button>
+      </div>
+      <hr class="my-2">
+      <label class="muted">Auto-update (s)</label>
+      <input id="intervalSec" class="form-control mb-2" value="30" type="number" min="5">
+      <button id="toggleAuto" class="btn btn-sm btn-outline-light">Iniciar Auto</button>
+    </div>
+    <div class="card p-3">
+      <h6>Resumo</h6>
+      <div id="quoteBox">Selecione símbolo e clique em Buscar.</div>
+    </div>
+  </div>
+  <div class="col-md-9">
+    <div class="card p-3 mb-3">
+      <canvas id="lineChart" height="150"></canvas>
+    </div>
+    <div class="card p-3">
+      <h6>Símbolos por Exchange</h6>
+      <div id="exchangeList"></div>
+    </div>
+  </div>
+</div>
+<script>
+  const EXCHANGES = {{ exchanges | tojson }};
+  let socket = io("/cotacoes");
+  socket.on("connect", ()=>console.log("socket connected"));
+  socket.on("price_update", function(data){
+    console.log("price_update", data);
+    const box = document.getElementById('quoteBox');
+    box.innerHTML = `<div><strong>${data.symbol}</strong></div><div class="muted">Preço (USD): ${data.price}</div><div class="muted">Atualizado: ${data.time}</div>`;
+  });
+
+  function populateExchanges(){
+    const sel = document.getElementById('exchange'); sel.innerHTML='';
+    Object.keys(EXCHANGES).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.text=k; sel.appendChild(o); });
+    sel.addEventListener('change', populateSymbols); populateSymbols();
+  }
+  function populateSymbols(){ const ex=document.getElementById('exchange').value; const sym=document.getElementById('symbol'); sym.innerHTML=''; EXCHANGES[ex].forEach(s=>{ const o=document.createElement('option'); o.value=s.symbol; o.text=s.name+' ('+s.symbol+')'; sym.appendChild(o); }); }
+  async function fetchQuote(){ const symbol = document.getElementById('symbol').value; const res = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`); const data = await res.json(); const box = document.getElementById('quoteBox'); if(data.error){ box.innerHTML = '<div class="text-danger">'+data.error+'</div>'; return; } box.innerHTML = `<div><strong>${data.symbol}</strong> — ${data.name||''}</div><div class="muted">Preço (USD): ${data.price}</div><div class="muted">Atualizado: ${data.updated}</div>`; }
+  let chart=null; function initChart(){ const ctx = document.getElementById('lineChart'); chart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [{ label: 'Preço (USD)', data: [], fill:true, tension:0.2 }] }, options: { responsive:true, plugins:{ zoom:{ pan:{ enabled:true, mode:'x' }, zoom:{ wheel:{ enabled:true }, pinch:{ enabled:true }, mode:'x' } } }, scales:{ x:{ display:true }, y:{ display:true } } } }); }
+  async function showHistory(){ const symbol = document.getElementById('symbol').value; const res = await fetch(`/api/history?symbol=${encodeURIComponent(symbol)}&days=7`); const payload = await res.json(); if(payload.error){ alert(payload.error); return; } chart.data.labels = payload.labels; chart.data.datasets[0].data = payload.values; chart.update(); }
+  let autoTimer=null; function startAuto(){ const sec = parseInt(document.getElementById('intervalSec').value)||30; if(autoTimer) clearInterval(autoTimer); autoTimer=setInterval(fetchQuote, sec*1000); document.getElementById('toggleAuto').innerText='Parar Auto'; } function stopAuto(){ if(autoTimer) clearInterval(autoTimer); autoTimer=null; document.getElementById('toggleAuto').innerText='Iniciar Auto'; }
+  document.addEventListener('DOMContentLoaded', ()=>{ populateExchanges(); initChart(); document.getElementById('refreshBtn').addEventListener('click', fetchQuote); document.getElementById('showChart').addEventListener('click', showHistory); document.getElementById('toggleAuto').addEventListener('click', ()=>{ if(autoTimer) stopAuto(); else startAuto(); }); const box = document.getElementById('exchangeList'); box.innerHTML=''; Object.keys(EXCHANGES).forEach(k=>{ const div=document.createElement('div'); div.className='mb-2'; div.innerHTML=`<strong>${k}</strong>: ${EXCHANGES[k].map(s=>s.symbol).join(', ')}`; box.appendChild(div); }); });
+</script>
+{% endblock %}
